@@ -4,19 +4,15 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding trackvise database...');
+  console.log('Checking trackvise database state...');
 
-  // Clean existing data
-  await prisma.invoice.deleteMany({});
-  await prisma.payment.deleteMany({});
-  await prisma.damage.deleteMany({});
-  await prisma.expense.deleteMany({});
-  await prisma.booking.deleteMany({});
-  await prisma.car.deleteMany({});
-  await prisma.customer.deleteMany({});
-  await prisma.subscription.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.tenant.deleteMany({});
+  const existingUsersCount = await prisma.user.count();
+  if (existingUsersCount > 0) {
+    console.log('Database already initialized with users. Skipping seed.');
+    return;
+  }
+
+  console.log('Seeding initial trackvise demo data...');
 
   const passwordHash = await bcrypt.hash('demo1234', 10);
   const superAdminHash = await bcrypt.hash('admin1234', 10);
