@@ -5,7 +5,7 @@
   "description": "trackvise — The Operating System for Car Rental Businesses",
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/db-sync.js && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
