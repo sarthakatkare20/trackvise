@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'An unexpected server error occurred.' },
+      { error: error?.message || 'An unexpected server error occurred.' },
       { status: 500 }
     );
   }
