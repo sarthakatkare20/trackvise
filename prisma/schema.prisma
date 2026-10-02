@@ -1,0 +1,250 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id            String         @id @default(cuid())
+  name          String
+  ownerName     String
+  email         String
+  phone         String
+  logo          String?
+  address       String?
+  city          String?
+  state         String?
+  country       String         @default("India")
+  currency      String         @default("INR")
+  timezone      String         @default("Asia/Kolkata")
+  gstNumber     String?
+  invoicePrefix String         @default("INV")
+  bookingPrefix String         @default("TV")
+  status        String         @default("ACTIVE") // ACTIVE, SUSPENDED, TRIAL
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  users         User[]
+  cars          Car[]
+  customers     Customer[]
+  bookings      Booking[]
+  payments      Payment[]
+  expenses      Expense[]
+  damages       Damage[]
+  invoices      Invoice[]
+  subscriptions Subscription[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  tenantId     String?   // null for platform SUPER_ADMIN
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("STAFF") // SUPER_ADMIN, BUSINESS_ADMIN, STAFF
+  status       String    @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+model Car {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  make               String    // e.g. Hyundai, Mahindra, Maruti, Tata, Toyota
+  model              String    // e.g. Creta, Thar, Swift, Nexon, Innova Crysta
+  variant            String?   // e.g. SX (O), LX 4x4, ZXi+
+  year               Int
+  registrationNumber String    // e.g. MH 02 DT 8821
+  fuelType           String    // Petrol, Diesel, EV, CNG
+  transmission       String    // Manual, Automatic
+  seats              Int       @default(5)
+  color              String
+  status             String    @default("AVAILABLE") // AVAILABLE, RESERVED, ON_RENT, MAINTENANCE, INACTIVE
+  images             String    @default("[]") // JSON array of image URLs
+  price12hr          Float     @default(1500)
+  price24hr          Float     @default(2500)
+  extraHourlyRate    Float     @default(150)
+  extraKmRate        Float     @default(12)
+  freeKmPerDay       Int       @default(250)
+  rcExpiry           DateTime?
+  insuranceExpiry    DateTime?
+  pucExpiry          DateTime?
+  odometer           Int       @default(15000)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  bookings           Booking[]
+  expenses           Expense[]
+  damages            Damage[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model Customer {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  phone         String
+  email         String?
+  address       String?
+  city          String?
+  licenseNumber String    // e.g. MH02-2018-0098762
+  licenseExpiry DateTime?
+  idProofType   String?   // Aadhaar, Passport, Voter ID
+  idProofNumber String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bookings      Booking[]
+  damages       Damage[]
+
+  @@index([tenantId])
+  @@index([phone])
+}
+
+model Booking {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingNumber   String    // e.g. TV-2026-000123
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  carId           String
+  car             Car       @relation(fields: [carId], references: [id])
+  pickupDate      DateTime
+  pickupTime      String    // "10:00"
+  dropDate        DateTime
+  dropTime        String    // "10:00"
+  pickupLocation  String    @default("Hub Office")
+  dropLocation    String    @default("Hub Office")
+  durationHours   Float     @default(24)
+  baseRentalPrice Float
+  discount        Float     @default(0)
+  additionalCharges Float   @default(0)
+  totalAmount     Float
+  advanceAmount   Float     @default(0)
+  paidAmount      Float     @default(0)
+  remainingAmount Float     @default(0)
+  status          String    @default("CONFIRMED") // PENDING, CONFIRMED, ACTIVE, COMPLETED, CANCELLED
+  paymentStatus   String    @default("UNPAID")    // UNPAID, PARTIAL, PAID
+  notes           String?
+  startOdometer   Int?
+  endOdometer     Int?
+  returnFuelLevel String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  payments        Payment[]
+  damages         Damage[]
+  invoices        Invoice[]
+
+  @@index([tenantId])
+  @@index([carId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount     Float
+  method     String   // UPI, Cash, Card, Bank Transfer, Other
+  reference  String?
+  paidAt     DateTime @default(now())
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([bookingId])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  carId       String?
+  car         Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
+  category    String   // Fuel, Maintenance, Repair, Insurance, Cleaning, Salary, Other
+  amount      Float
+  date        DateTime @default(now())
+  description String
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([carId])
+}
+
+model Damage {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  carId          String
+  car            Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  customerId     String?
+  customer       Customer?@relation(fields: [customerId], references: [id], onDelete: SetNull)
+  description    String
+  photos         String   @default("[]") // JSON array of photo URLs
+  customerCharge Float    @default(0)
+  repairCost     Float    @default(0)
+  status         String    @default("REPORTED") // REPORTED, CHARGED, REPAIR_PENDING, REPAIRED, CLOSED
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([carId])
+  @@index([bookingId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookingId     String
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  invoiceNumber String   // e.g. INV-2026-000001
+  subtotal      Float
+  discount      Float    @default(0)
+  taxRate       Float    @default(0) // GST % if applicable
+  taxAmount     Float    @default(0)
+  total         Float
+  paid          Float
+  remaining     Float
+  status        String   @default("ISSUED") // DRAFT, ISSUED, PAID, CANCELLED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([bookingId])
+}
+
+model Subscription {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan        String    @default("trackvise Standard") // trackvise Standard (₹2,999/month)
+  amount      Float     @default(2999)
+  status      String    @default("ACTIVE") // TRIAL, ACTIVE, PAST_DUE, CANCELLED, SUSPENDED
+  startDate   DateTime  @default(now())
+  renewalDate DateTime
+  trialEndsAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+}
